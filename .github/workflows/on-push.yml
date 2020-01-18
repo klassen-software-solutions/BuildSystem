@@ -1,0 +1,36 @@
+name: On Push
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Setup Python
+      if: |
+        !startsWith(github.event.head_commit.message, 'WIP')
+        && !startsWith(github.ref, 'refs/heads/master')
+        && !startsWith(github.ref, 'refs/heads/development/')
+      uses: actions/setup-python@v1
+      with:
+        python-version: '3.x'
+
+    - name: Install Tools
+      if: |
+        !startsWith(github.event.head_commit.message, 'WIP')
+        && !startsWith(github.ref, 'refs/heads/master')
+        && !startsWith(github.ref, 'refs/heads/development/')
+      run: |
+        sudo python3 -m pip install pylint
+        sudo python3 -m pip install requests
+        brew install shellcheck
+
+    - name: Static Analysis
+      if: |
+        !startsWith(github.event.head_commit.message, 'WIP')
+        && !startsWith(github.ref, 'refs/heads/master')
+        && !startsWith(github.ref, 'refs/heads/development/')
+      run: |
+        make analyze
