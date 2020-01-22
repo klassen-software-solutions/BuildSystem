@@ -317,19 +317,25 @@ class Scanner(ABC):
 class ManuallyEditedScanner(Scanner):
     """Scanner that adds any existing items that have been manually edited."""
 
+    def __init__(self):
+        super().__init__()
+        self._entries = None
+
     def should_scan(self) -> bool:
-        return os.path.isfile(_PREREQS_LICENSE_FILE)
+        if os.path.isfile(_PREREQS_LICENSE_FILE):
+            entries = []
+            with open(_PREREQS_LICENSE_FILE) as infile:
+                data = json.load(infile)
+                for dep in data['dependencies']:
+                    if dep.get('x-manuallyEdited', False):
+                        entries.append(dep)
+            self._entries = entries
+        return bool(self._entries)
 
     def scan(self) -> List:
-        entries = []
-        with open(_PREREQS_LICENSE_FILE) as infile:
-            data = json.load(infile)
-            for dep in data['dependencies']:
-                if dep.get('x-manuallyEdited', False):
-                    entries.append(dep)
-        if entries:
-            logging.info("   found %s", [sub['moduleName'] for sub in entries])
-        return entries
+        if self._entries:
+            logging.info("   found %s", [sub['moduleName'] for sub in self._entries])
+        return self._entries
 
 
 class TarballScanner(Scanner):
@@ -451,7 +457,8 @@ class PipScanner(Scanner):
         self._pips = None
 
     def should_scan(self) -> bool:
-        self._load_pip_prerequisites()
+        if os.path.isfile(_PREREQS_FILE):
+            self._load_pip_prerequisites()
         return bool(self._pips)
 
     def scan(self) -> List:
@@ -536,9 +543,12 @@ class PipScanner(Scanner):
 # MARK: Main Entry Point
 
 def _write_licenses(licenses: Dict):
-    data = {'dependencies': sorted(licenses.values(), key=lambda x: x['moduleName'])}
-    with open(_PREREQS_LICENSE_FILE, 'w') as outfile:
-        json.dump(data, outfile, indent=4, sort_keys=True)
+    if len(licenses) > 0:
+        data = {'dependencies': sorted(licenses.values(), key=lambda x: x['moduleName'])}
+        with open(_PREREQS_LICENSE_FILE, 'w') as outfile:
+            json.dump(data, outfile, indent=4, sort_keys=True)
+    else:
+        logging.info("No dependancies found.")
 
 def _get_module_name() -> str:
     return os.path.basename(os.getcwd())
