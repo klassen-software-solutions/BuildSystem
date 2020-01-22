@@ -25,11 +25,20 @@
 
    The added fields are as follows:
 
-    x-manuallyEdited: Set this to true to mark a manual entry in the file. Use this
-        to handle the cases that we cannot deal with automatically.
     x-usedBy: Will list the prerequisites that use this module.
     x-spdxId: If the license is recognized in the SPDX database, this is the id.
     x-isOsiApproved: Will be true if the SPDX database marks this as approved.
+
+    The following fields are not added by this module, but may be manually added and
+    relate to the operation of the module.
+
+    x-manuallyEdited: Set this to true to mark a manual entry in the file. Use this
+        to handle the cases that we cannot deal with automatically. The scanner will
+        always include the manually edited entries without change except for adding
+        to the x-usedBy list.
+    x-comments: Not actually used by this package but we recommend adding this field
+        if you set x-manuallyEdited to true in order to explain why the license is
+        considered acceptable.
 """
 
 import argparse
@@ -43,6 +52,9 @@ import sys
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, Tuple
+
+import requests
+
 
 _PREREQS_DIRECTORY = '.prereqs/Darwin-x86_64'
 _PREREQS_LICENSE_FILE = 'Dependancies/prereqs-licenses.json'
@@ -78,6 +90,17 @@ def _read_file_contents(filename: str) -> str:
         data = file.read().replace('\n', '')
     return data.strip()
 
+def _get(url: str):
+    assert bool(url), 'Must define a URL'
+    logging.debug("GET %s", url)
+    resp = requests.get(url, headers={'Accept': 'application/json'})
+    if not (resp.status_code >= 200 and resp.status_code < 300):
+        raise RuntimeError("GET of %s did not return an OK response" % url)
+    ctype = resp.headers.get('content-type', '')
+    if not ctype.startswith('application/json'):
+        raise RuntimeError("GET of %s did not claim to be 'application/json'" % url)
+    return resp.json()
+
 
 # pylint: disable=missing-function-docstring
 #   Justification: we don't need docstrings on the methods in a private class.
@@ -110,12 +133,11 @@ class _SPDX:
                 entry = self._try_ninka_overrides(srch)
         return entry
 
-    def set_into_license(self, lic: Dict):
-        entry = self.search(lic['moduleLicense'])
-        if entry:
-            lic['moduleLicense'] = entry['name']
-            lic['x-spdxId'] = entry['licenseId']
-            lic['x-isOsiApproved'] = entry['isOsiApproved']
+    @classmethod
+    def set_into_license(cls, entry: Dict, lic: Dict):
+        lic['moduleLicense'] = entry['name']
+        lic['x-spdxId'] = entry['licenseId']
+        lic['x-isOsiApproved'] = entry['isOsiApproved']
 
     def _try_name_search(self, name: str) -> Dict:
         licenseid = self._name_map.get(name, None)
@@ -132,14 +154,92 @@ class _SPDX:
         return None
 
 
+# pylint: disable=too-few-public-methods
+#   Justification: There is only one feasible method and we wish to retain state hence
+#                  the need for the class.
+class _GitHubAPI:
+    def __init__(self):
+        self._cached = {}
+
+    def lookup(self, url: str) -> str:
+        host, organization, project = self._parse_url(url)
+        if organization in self._cached:
+            return self._license_from_entry(self._cached[organization], project)
+        if host == 'github.com':
+            logging.info("   Looking up '%s' in github", url)
+            projects = self._try_api('orgs', organization)
+            if projects is None:
+                projects = self._try_api('users', organization)
+            if projects is not None:
+                self._cached[organization] = projects
+                return self._license_from_entry(projects, project)
+        return None
+
+    @classmethod
+    def _try_api(cls, key: str, organization: str) -> List:
+        if cls._can_call_github():
+            try:
+                return _get("https://api.github.com/%s/%s/repos" % (key, organization))
+            # pylint: disable=broad-except
+            #   Justification: We really do want to trap all user defined exceptions.
+            except Exception:
+                pass
+        return None
+
+    @classmethod
+    def _parse_url(cls, url):
+        host = None
+        organization = None
+        project = None
+        if url:
+            parsed_url = urllib.parse.urlparse(url)
+            host = parsed_url.netloc
+            parts = parsed_url.path.split('/')
+            for i, part in enumerate(parts):
+                part = parts[i]
+                if part == '':
+                    continue
+                if organization is None:
+                    organization = part
+                    continue
+                if project is None:
+                    project = part
+                    break
+        return host, organization, project
+
+    @classmethod
+    def _can_call_github(cls) -> bool:
+        try:
+            remaining = _get("https://api.github.com/rate_limit")['rate']['remaining']
+            logging.debug("  GitHub API calls remaining: %d", remaining)
+            return remaining > 0
+        # pylint: disable=broad-except
+        #   Justification: We really do want to trap all user defined exceptions.
+        except Exception as ex:
+            logging.warning("%s", ex)
+            return False
+
+    @classmethod
+    def _license_from_entry(cls, projects: List, project_name: str) -> str:
+        for project in projects:
+            if project.get('name', '') == project_name:
+                lic = project.get('license', {})
+                return lic.get('spdx_id', None)
+        return None
+
+
+
 # MARK: Scanner Infrastructure
 
 class Scanner(ABC):
     """Base class defining the scanning API and providing common scanning helper methods."""
 
     spdx = None
+    _github = None
 
     def __init__(self):
+        if not Scanner._github:
+            Scanner._github = _GitHubAPI()
         if not Scanner.spdx:
             Scanner.spdx = _SPDX(_SPDX_LICENSES)
 
@@ -162,6 +262,7 @@ class Scanner(ABC):
 
     @classmethod
     def guess_license_with_ninka(cls, filename: str) -> str:
+        """Given a filename, use ninka to try to determine the license type."""
         licensetype = _get_run("ninka %s | cut -d ';' -f2" % filename)
         entry = cls.spdx.search(licensetype)
         if entry:
@@ -182,20 +283,31 @@ class Scanner(ABC):
         if self.should_scan():
             logging.info("Running the scanner '%s'", type(self).__name__)
             new_licenses = self.scan()
-            for lic in new_licenses:
-                key = lic['moduleName']
-                if key in licenses:
-                    if self._should_add_to_used_by(lic):
-                        self.ensure_used_by(modulename, licenses[key])
-                    logging.info("   Entry '%s' already exists", lic['moduleName'])
+            self._adjust_and_add_new_licenses(modulename, new_licenses, licenses)
+
+    def _adjust_and_add_new_licenses(self, modulename: str, new_licenses: Dict, licenses: Dict):
+        for lic in new_licenses:
+            key = lic['moduleName']
+            if key in licenses:
+                if self._should_add_to_used_by(lic):
+                    self.ensure_used_by(modulename, licenses[key])
+                logging.info("   Entry '%s' already exists", lic['moduleName'])
+            else:
+                if self._should_add_to_used_by(lic):
+                    self.ensure_used_by(modulename, lic)
+                entry = self.spdx.search(lic['moduleLicense'])
+                if entry:
+                    self.spdx.set_into_license(entry, lic)
                 else:
-                    if self._should_add_to_used_by(lic):
-                        self.ensure_used_by(modulename, lic)
-                    self.spdx.set_into_license(lic)
-                    licenses[key] = lic
-                    logging.info("   Added '%s' as '%s'",
-                                 lic['moduleName'],
-                                 lic['moduleLicense'])
+                    licenseid = self._github.lookup(lic.get('moduleUrl', None))
+                    if licenseid:
+                        entry = self.spdx.get_entry(licenseid)
+                        if entry:
+                            self.spdx.set_into_license(entry, lic)
+                licenses[key] = lic
+                logging.info("   Added '%s' as '%s'",
+                             lic['moduleName'],
+                             lic['moduleLicense'])
 
     @classmethod
     def _should_add_to_used_by(cls, lic: Dict) -> bool:

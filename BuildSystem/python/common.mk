@@ -19,7 +19,7 @@ prereqs:
 	BuildSystem/common/update_prereqs.py
 
 check: build
-	echo TODO: run the tests
+	python3 -m unittest discover --start-directory Tests
 
 analyze:
 	BuildSystem/python/python_analyzer.py $(PREFIX)
