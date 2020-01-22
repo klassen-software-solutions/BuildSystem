@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-"""Scan the dependancies for licenses and produce a report.
+"""Scan the dependencies for licenses and produce a report.
 
-   Dependancies
+   Dependencies
    ------------
    ninka - Program used to classify license-like files. We don't automatically
     install this. See http://ninka.turingmachine.org for more information.
@@ -57,8 +57,8 @@ import requests
 
 
 _PREREQS_DIRECTORY = '.prereqs/Darwin-x86_64'
-_PREREQS_LICENSE_FILE = 'Dependancies/prereqs-licenses.json'
-_PREREQS_FILE = 'Dependancies/prereqs.json'
+_PREREQS_LICENSE_FILE = 'Dependencies/prereqs-licenses.json'
+_PREREQS_FILE = 'Dependencies/prereqs.json'
 _SPDX_LICENSES = 'BuildSystem/common/spdx-licenses.json'
 
 
@@ -90,6 +90,13 @@ def _read_file_contents(filename: str) -> str:
         data = file.read().replace('\n', '')
     return data.strip()
 
+# Note that this will return either a List or a Dict depending on the contents
+# of the JSON file.
+def _read_json_file(filename: str):
+    logging.debug("Reading %s as JSON", filename)
+    with open(filename) as infile:
+        return json.load(infile)
+
 def _get(url: str):
     assert bool(url), 'Must define a URL'
     logging.debug("GET %s", url)
@@ -114,11 +121,9 @@ class _SPDX:
         entries = {}
         name_map = {}
         logging.info("Reading SPDX entries from %s", filename)
-        with open(filename) as infile:
-            data = json.load(infile)
-            for lic in data['licenses']:
-                entries[lic['licenseId']] = lic
-                name_map[lic['name']] = lic['licenseId']
+        for lic in _read_json_file(filename)['licenses']:
+            entries[lic['licenseId']] = lic
+            name_map[lic['name']] = lic['licenseId']
         self._entries = entries
         self._name_map = name_map
 
@@ -274,7 +279,8 @@ class Scanner(ABC):
         """Ensure that the given modulename is in the usedBy field and in the correct order.
         """
         if 'x-usedBy' in lic:
-            bisect.insort(lic['x-usedBy'], modulename)
+            if modulename not in lic['x-usedBy']:
+                bisect.insort(lic['x-usedBy'], modulename)
         else:
             lic['x-usedBy'] = [modulename]
 
@@ -324,11 +330,9 @@ class ManuallyEditedScanner(Scanner):
     def should_scan(self) -> bool:
         if os.path.isfile(_PREREQS_LICENSE_FILE):
             entries = []
-            with open(_PREREQS_LICENSE_FILE) as infile:
-                data = json.load(infile)
-                for dep in data['dependencies']:
-                    if dep.get('x-manuallyEdited', False):
-                        entries.append(dep)
+            for dep in _read_json_file(_PREREQS_LICENSE_FILE)['dependencies']:
+                if dep.get('x-manuallyEdited', False):
+                    entries.append(dep)
             self._entries = entries
         return bool(self._entries)
 
@@ -338,36 +342,93 @@ class ManuallyEditedScanner(Scanner):
         return self._entries
 
 
-class TarballScanner(Scanner):
-    """Scanner that examines the git and tarball prerequisites in the project."""
+class DirectoryBasedScanner(Scanner):
+    """Base class for scanners that are based on an already checked out source directory."""
 
     def __init__(self):
-        super(TarballScanner, self).__init__()
-        self._prereqs = None
-
-    def should_scan(self) -> bool:
-        self._prereqs = self._get_tarball_prerequisites()
-        return bool(self._prereqs)
+        super().__init__()
+        self._entries = None
 
     def scan(self) -> List:
-        assert len(self._prereqs) > 0
         lics = {}
-        for prereq in self._prereqs:
+        entries = self.get_project_list()
+        for prereq in entries:
             logging.info("   ...examining '%s'", prereq['name'])
             self._process_prereq(prereq, lics)
         return lics.values()
 
+    def get_project_list(self) -> List:
+        """Subclasses must override this to return a list of dictionary objects.
+
+        Each object in the returned list should have the following members:
+          name: a string containing the project name
+          directory: a string providing where the directory exists
+          version (optional): a string containing the project version
+          url (optional): a string providing the project URL
+
+        Note that this will only be called if should_scan() returns True.
+        """
+        raise NotImplementedError()
+
     @classmethod
-    def _get_tarball_prerequisites(cls, directory='.') -> List:
+    def _process_prereq(cls, prereq: Dict, licenses: List):
+        details = cls._details_for_prereq(prereq)
+        other_licenses = details['otherLicenses']
+        if other_licenses:
+            logging.info("      also found %s", [sub['moduleName'] for sub in other_licenses])
+            for lic in other_licenses:
+                if lic['moduleName'] in licenses:
+                    cls.ensure_used_by(prereq['name'], licenses[lic['moduleName']])
+                else:
+                    licenses[lic['moduleName']] = lic
+        lic = cls._license_from_details(details)
+        assert lic['moduleName'] not in licenses
+        licenses[lic['moduleName']] = lic
+
+    @classmethod
+    def _details_for_prereq(cls, entry: Dict) -> Dict:
+        details = entry.copy()
+        directory = entry['directory']
+        details['otherLicenses'] = cls._get_other_licenses(directory)
+        details['license'] = 'Unknown'
+        if directory is not None and os.path.isdir(directory):
+            filename = "%s/%s" % (directory, _get_license_filename(directory))
+            if os.path.isfile(filename):
+                details['license'] = cls.guess_license_with_ninka(filename)
+        return details
+
+    @classmethod
+    def _get_other_licenses(cls, directory: str) -> List:
+        filename = "%s/%s" % (directory, _PREREQS_LICENSE_FILE)
+        if os.path.isfile(filename):
+            return _read_json_file(filename)['dependencies']
+        return None
+
+    @classmethod
+    def _license_from_details(cls, details: Dict) -> Dict:
+        lic = {'moduleName': details['name']}
+        if details['version']:
+            lic['moduleVersion'] = details['version']
+        if details['url']:
+            lic['moduleUrl'] = details['url']
+        lic['moduleLicense'] = 'Unknown' if not details['license'] else details['license']
+        return lic
+
+
+class KSSPrereqScanner(DirectoryBasedScanner):
+    """Scanner that examines the git and tarball prerequisites in the project."""
+
+    def should_scan(self) -> bool:
+        return os.path.isfile(_PREREQS_FILE)
+
+    def get_project_list(self) -> List:
         try:
             prereqs = []
-            with open("%s/%s" % (directory, _PREREQS_FILE)) as infile:
-                data = json.load(infile)
-                for entry in data:
-                    if 'git' in entry:
-                        prereqs.append(cls._prereq_for_git_entry(entry))
-                    if 'tarball' in entry:
-                        prereqs.append(cls._prereq_for_tarball_entry(entry))
+            for entry in _read_json_file(_PREREQS_FILE):
+                if 'git' in entry:
+                    prereqs.append(self._prereq_for_git_entry(entry))
+                if 'tarball' in entry:
+                    prereqs.append(self._prereq_for_tarball_entry(entry))
             return prereqs
         except FileNotFoundError:
             return None
@@ -405,48 +466,61 @@ class TarballScanner(Scanner):
         version = None if len(parts) == 1 else parts[1]
         return (name, version, directory)
 
-    @classmethod
-    def _process_prereq(cls, prereq: Dict, licenses: List):
-        details = cls._details_for_prereq(prereq)
-        other_licenses = details['otherLicenses']
-        if other_licenses:
-            logging.info("      also found %s", [sub['moduleName'] for sub in other_licenses])
-            for lic in other_licenses:
-                if lic['moduleName'] in licenses:
-                    cls.ensure_used_by(prereq['name'], licenses[lic['moduleName']])
-                else:
-                    licenses[lic['moduleName']] = lic
-        lic = cls._license_from_details(details)
-        assert lic['moduleName'] not in licenses
-        licenses[lic['moduleName']] = lic
+
+class SwiftModuleScanner(DirectoryBasedScanner):
+    """Scanner that examines swift module prerequisites."""
+
+    def __init__(self):
+        super().__init__()
+        self._files = None
+
+    def should_scan(self) -> bool:
+        self._files = self._get_xcode_package_dependency_files()
+        return bool(self._files)
+
+    def get_project_list(self) -> List:
+        projects = {}
+        for filename in self._files:
+            logging.info("   ...examining '%s'", filename)
+            entries = self._get_entries_for_xcode_package_dependency_file(filename)
+            logging.info("      found %s", sorted([sub['name'] for sub in entries]))
+            for entry in entries:
+                key = entry['name']
+                if key not in projects:
+                    projects[key] = entry
+        return sorted(projects.values(), key=lambda x: x['name'])
 
     @classmethod
-    def _details_for_prereq(cls, entry: Dict) -> Dict:
-        details = entry.copy()
-        directory = entry['directory']
-        details['otherLicenses'] = cls._get_other_licenses(directory)
-        filename = "%s/%s" % (directory, _get_license_filename(directory))
-        details['license'] = cls.guess_license_with_ninka(filename)
-        return details
+    def _get_xcode_package_dependency_files(cls) -> List:
+        files = []
+        for line in _process('find . -name Package.resolved'):
+            files.append(line.decode('utf-8').rstrip())
+        return files
 
     @classmethod
-    def _get_other_licenses(cls, directory: str) -> List:
-        filename = "%s/%s" % (directory, _PREREQS_LICENSE_FILE)
-        if os.path.isfile(filename):
-            with open(filename) as infile:
-                data = json.load(infile)
-                return data['dependencies']
+    def _get_entries_for_xcode_package_dependency_file(cls, filename: str) -> List:
+        entries = []
+        for pin in _read_json_file(filename)['object']['pins']:
+            name = pin['package']
+            entry = {
+                'name': name,
+                'version': pin['state'].get('version', None),
+                'directory': cls._get_project_directory(name),
+                'url': pin.get('repositoryURL', None)
+            }
+            entries.append(entry)
+        return entries
+
+    @classmethod
+    def _get_project_directory(cls, name: str) -> str:
+        deriveddata = os.path.expanduser("~/Library/Developer/Xcode/DerivedData")
+        if os.path.isdir(deriveddata):
+            for line in _process("find %s -type d -name %s" % (deriveddata, name)):
+                line = line.decode('utf-8').rstrip()
+                if os.path.isdir(line):
+                    return line
+        logging.warning("Could not find the source directory for %s", name)
         return None
-
-    @classmethod
-    def _license_from_details(cls, details: Dict) -> Dict:
-        lic = {'moduleName': details['name']}
-        if details['version']:
-            lic['moduleVersion'] = details['version']
-        if details['url']:
-            lic['moduleUrl'] = details['url']
-        lic['moduleLicense'] = 'Unknown' if not details['license'] else details['license']
-        return lic
 
 
 class PipScanner(Scanner):
@@ -471,11 +545,9 @@ class PipScanner(Scanner):
 
     def _load_pip_prerequisites(self):
         self._pips = []
-        with open(_PREREQS_FILE) as infile:
-            data = json.load(infile)
-            for entry in data:
-                if 'pip' in entry:
-                    self._pips.append(entry['pip'])
+        for entry in _read_json_file(_PREREQS_FILE):
+            if 'pip' in entry:
+                self._pips.append(entry['pip'])
 
     @classmethod
     def _get_pip_module_details(cls, pip: str) -> Dict:
@@ -544,11 +616,13 @@ class PipScanner(Scanner):
 
 def _write_licenses(licenses: Dict):
     if len(licenses) > 0:
+        if not os.path.isdir('Dependencies'):
+            os.mkdir('Dependencies')
         data = {'dependencies': sorted(licenses.values(), key=lambda x: x['moduleName'])}
         with open(_PREREQS_LICENSE_FILE, 'w') as outfile:
             json.dump(data, outfile, indent=4, sort_keys=True)
     else:
-        logging.info("No dependancies found.")
+        logging.info("No dependencies found.")
 
 def _get_module_name() -> str:
     return os.path.basename(os.getcwd())
@@ -563,7 +637,10 @@ def _main():
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
     modulename = _get_module_name()
     licenses = {}
-    scanners = [ManuallyEditedScanner(), TarballScanner(), PipScanner()]
+    scanners = [ManuallyEditedScanner(),
+                KSSPrereqScanner(),
+                SwiftModuleScanner(),
+                PipScanner()]
     for scanner in scanners:
         scanner.add_licenses(modulename, licenses)
     _write_licenses(licenses)
