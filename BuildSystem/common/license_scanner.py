@@ -136,6 +136,11 @@ class _SPDX:
             entry = self._try_name_search(srch)
             if not entry:
                 entry = self._try_ninka_overrides(srch)
+        if entry:
+            logging.debug("  SPDX identified '%s' as '%s' (id='%s')",
+                          srch,
+                          entry['name'],
+                          entry['licenseId'])
         return entry
 
     @classmethod
@@ -165,9 +170,12 @@ class _SPDX:
 class _GitHubAPI:
     def __init__(self):
         self._cached = {}
+        self._remaining_calls = -1
 
     def lookup(self, url: str) -> str:
         host, organization, project = self._parse_url(url)
+        if project.endswith('.git'):
+            project = project[:-4]
         if organization in self._cached:
             return self._license_from_entry(self._cached[organization], project)
         if host == 'github.com':
@@ -180,9 +188,8 @@ class _GitHubAPI:
                 return self._license_from_entry(projects, project)
         return None
 
-    @classmethod
-    def _try_api(cls, key: str, organization: str) -> List:
-        if cls._can_call_github():
+    def _try_api(self, key: str, organization: str) -> List:
+        if self._can_call_github():
             try:
                 return _get("https://api.github.com/%s/%s/repos" % (key, organization))
             # pylint: disable=broad-except
@@ -212,12 +219,15 @@ class _GitHubAPI:
                     break
         return host, organization, project
 
-    @classmethod
-    def _can_call_github(cls) -> bool:
+    def _can_call_github(self) -> bool:
         try:
-            remaining = _get("https://api.github.com/rate_limit")['rate']['remaining']
-            logging.debug("  GitHub API calls remaining: %d", remaining)
-            return remaining > 0
+            if self._remaining_calls == -1:
+                self._remaining_calls = _get("https://api.github.com/rate_limit")['rate']['remaining']
+            logging.debug("  GitHub API calls remaining: %d", self._remaining_calls)
+            if self._remaining_calls > 0:
+                self._remaining_calls -= 1
+                return True
+            return False
         # pylint: disable=broad-except
         #   Justification: We really do want to trap all user defined exceptions.
         except Exception as ex:
@@ -229,7 +239,10 @@ class _GitHubAPI:
         for project in projects:
             if project.get('name', '') == project_name:
                 lic = project.get('license', {})
-                return lic.get('spdx_id', None)
+                lic_name = lic.get('spdx_id', None)
+                if lic_name:
+                    logging.debug("  Github identified license as '%s'", lic_name)
+                return lic_name
         return None
 
 
@@ -269,6 +282,7 @@ class Scanner(ABC):
     def guess_license_with_ninka(cls, filename: str) -> str:
         """Given a filename, use ninka to try to determine the license type."""
         licensetype = _get_run("ninka %s | cut -d ';' -f2" % filename)
+        logging.debug("  Ninka identified license as '%s'", licensetype)
         entry = cls.spdx.search(licensetype)
         if entry:
             licensetype = entry['name']
