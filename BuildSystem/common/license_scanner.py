@@ -222,7 +222,8 @@ class _GitHubAPI:
     def _can_call_github(self) -> bool:
         try:
             if self._remaining_calls == -1:
-                self._remaining_calls = _get("https://api.github.com/rate_limit")['rate']['remaining']
+                result = _get("https://api.github.com/rate_limit")
+                self._remaining_calls = result['rate']['remaining']
             logging.debug("  GitHub API calls remaining: %d", self._remaining_calls)
             if self._remaining_calls > 0:
                 self._remaining_calls -= 1
