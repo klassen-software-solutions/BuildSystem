@@ -25,7 +25,7 @@ check: build
 analyze:
 	BuildSystem/python/python_analyzer.py $(PREFIX)
 
-install:
+install: build
 	python3 -m pip install --user .
 
 clean:
