@@ -4,8 +4,8 @@ build:
 
 analyze:
 	pylint \
-		BuildSystem/common/*.py \
-		BuildSystem/python/*.py
+		common/*.py \
+		python/*.py
 	shellcheck \
-		BuildSystem/c++/*.sh \
-		BuildSystem/common/*.sh
+		c++/*.sh \
+		common/*.sh
