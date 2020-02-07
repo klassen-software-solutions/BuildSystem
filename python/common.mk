@@ -8,14 +8,17 @@ endif
 
 # Force the version to be updated.
 VERSION := $(shell BuildSystem/common/revision.sh --format=python)
+VERSION_FILE := $(PREFIX)/$(PACKAGE)/_version.py
 
 
-build: $(PREREQS_LICENSE_FILE) REVISION
-	BuildSystem/python/update_init.sh $(PREFIX) $(PACKAGE)
+build: $(PREREQS_LICENSE_FILE) $(VERSION_FILE) REVISION
 	python3 setup.py sdist bdist_wheel
 
 $(PREREQS_LICENSE_FILE): Dependancies/prereqs.json
 	BuildSystem/common/license_scanner.py
+
+$(VERSION_FILE): REVISION
+	BuildSystem/python/update_version.sh $(PREFIX) $(PACKAGE)
 
 prereqs:
 	BuildSystem/common/update_prereqs.py
