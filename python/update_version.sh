@@ -47,12 +47,11 @@ fi
 initfile="$packagedir/__init__.py"
 if [ ! -f "$initfile" ]; then
     echo "Creating $initfile"
-    cp BuildSystem/python/_init_file_template.py "$initfile"
+    cp BuildSystem/python/_init_file.py-template "$initfile"
 else
-    grep "__version__" "$initfile" > /dev/null
-    if [ $? -ne 0 ]; then
+    if ! grep "__version__" "$initfile" > /dev/null; then
         echo "Adding version reference to $initfile"
         echo "" >> "$initfile"
-        grep --invert-match "^#" BuildSystem/python/_init_file_template.py >> "$initfile"
+        grep --invert-match "^#" BuildSystem/python/_init_file.py-template >> "$initfile"
     fi
 fi
