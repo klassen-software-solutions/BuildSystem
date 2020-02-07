@@ -8,4 +8,5 @@ analyze:
 		python/*.py
 	shellcheck \
 		c++/*.sh \
-		common/*.sh
+		common/*.sh \
+		python/*.sh
