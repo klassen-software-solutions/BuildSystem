@@ -11,6 +11,7 @@ VERSION := $(shell BuildSystem/common/revision.sh --format=python)
 
 
 build: $(PREREQS_LICENSE_FILE) REVISION
+	BuildSystem/python/update_init.sh $(PREFIX) $(PACKAGE)
 	python3 setup.py sdist bdist_wheel
 
 $(PREREQS_LICENSE_FILE): Dependancies/prereqs.json
