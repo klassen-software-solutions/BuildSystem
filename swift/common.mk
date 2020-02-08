@@ -1,8 +1,8 @@
-.PHONY: clean prep build check analyze
+.PHONY: analyze build check clean prep
 
 build:
 	echo TODO: build the package
-	BuildSystem/common/license_scanner.py
+	python3 -m kss.license.entry_point
 
 prep:
 	echo TODO: auto preparation
