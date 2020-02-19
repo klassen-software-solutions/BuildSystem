@@ -9,4 +9,5 @@ analyze:
 	shellcheck \
 		c++/*.sh \
 		common/*.sh \
-		python/*.sh
+		python/*.sh \
+		swift/*.sh
