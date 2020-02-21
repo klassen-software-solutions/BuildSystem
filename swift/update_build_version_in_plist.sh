@@ -31,5 +31,3 @@ for plist in $plists; do
         echo "   current version is $versionFromPlist, from GIT tag is $versionFromGit"
     fi
 done
-
-echo "Done"
