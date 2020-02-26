@@ -5,7 +5,8 @@ build:
 analyze:
 	pylint \
 		common/*.py \
-		python/*.py
+		python/*.py \
+		swift/*.py
 	shellcheck \
 		c++/*.sh \
 		common/*.sh \
