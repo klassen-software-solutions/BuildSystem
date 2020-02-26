@@ -1,13 +1,13 @@
 .PHONY: analyze build check clean prep
 
 build:
-	echo TODO: build the package
+	swift build
 
 prereqs:
 	BuildSystem/common/update_prereqs.py
 
 check: build
-	echo TODO: run tests
+	swift test
 
 analyze:
 	echo TODO: run analyze
