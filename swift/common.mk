@@ -1,6 +1,14 @@
-.PHONY: analyze build check clean docs prep
+.PHONY: analyze build check clean docs forcelicense prep
 
-build:
+LICENSE_DEPENDENCIES :=
+ifneq ($(wildcard Dependencies/manual-licenses.json),)
+	LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) Dependencies/manual-licenses.json
+endif
+ifneq ($(wildcard Package.swift),)
+	LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) Package.swift
+endif
+
+build: forcelicense
 	swift build
 
 prereqs:
@@ -20,3 +28,8 @@ clean:
 
 cleanall: clean
 	rm -rf docs
+
+forcelicense: Dependencies/prereqs-licenses.json
+
+Dependencies/prereqs-licenses.json: $(LICENSE_DEPENDENCIES)
+	license-scanner
