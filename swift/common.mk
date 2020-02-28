@@ -1,9 +1,12 @@
 .PHONY: analyze build check clean docs forcelicense prep
 
 SWIFT_BUILD_COMMAND :=
+SWIFT_TEST_COMMAND :=
 ifneq ($(wildcard Package.swift),)
 	SWIFT_BUILD_COMMAND := swift build
+	SWIFT_TEST_COMMAND := swift test
 endif
+
 
 LICENSE_DEPENDENCIES :=
 ifneq ($(wildcard Dependencies/manual-licenses.json),)
@@ -20,7 +23,7 @@ prereqs:
 	BuildSystem/common/update_prereqs.py
 
 check: build
-	swift test
+	$(SWIFT_TEST_COMMAND)
 
 analyze:
 	echo TODO: run analyze
