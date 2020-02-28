@@ -1,5 +1,10 @@
 .PHONY: analyze build check clean docs forcelicense prep
 
+SWIFT_BUILD_COMMAND :=
+ifneq ($(wildcard Package.swift),)
+	SWIFT_BUILD_COMMAND := swift build
+endif
+
 LICENSE_DEPENDENCIES :=
 ifneq ($(wildcard Dependencies/manual-licenses.json),)
 	LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) Dependencies/manual-licenses.json
@@ -9,7 +14,7 @@ ifneq ($(wildcard Package.swift),)
 endif
 
 build: forcelicense
-	swift build
+	$(SWIFT_BUILD_COMMAND)
 
 prereqs:
 	BuildSystem/common/update_prereqs.py
