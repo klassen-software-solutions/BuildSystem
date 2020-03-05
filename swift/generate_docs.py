@@ -35,10 +35,11 @@ def _recreate_docs_directory():
         shutil.rmtree('docs')
     os.mkdir('docs')
 
-def _generate_docs_for(target: str):
+def _generate_docs_for(target: str, version: str):
     logging.info("Generating docs for %s", target)
     command = "jazzy"
     command += " --module=%s" % target
+    command += " --module-version='%s'" % version
     command += " --output='docs/%s'" % target
     command += " --use-safe-filenames"
     if os.path.isfile('logo.png'):
@@ -54,7 +55,7 @@ def _generate_docs_for(target: str):
         command += " --github_url='%s'" % git_url
     _run(command)
 
-def _write_index(targets: List):
+def _write_index(targets: List, version: str):
     logging.info("Writing index file")
     package_name = os.path.basename(os.getcwd())
     with open('docs/index.html', 'w') as outfile:
@@ -72,7 +73,8 @@ def _write_index(targets: List):
         outfile.write("<article class='main-conent'>\n")
         outfile.write("<section class='section'>\n")
         outfile.write("<h1 class='heading'>Index of %s</h1>\n" % package_name)
-        outfile.write("<p>The %s package includes the following modules:</p>\n" % package_name)
+        outfile.write("<h2>Version %s</h2>\n" % version)
+        outfile.write("<h2>Modules</h2>\n")
         outfile.write("<ul>\n")
         for target in targets:
             outfile.write("<li><a href='%s/index.html'>%s</a></li>\n" % (target, target))
@@ -87,10 +89,11 @@ def _main():
     logging.basicConfig(level=logging.DEBUG)
     package = json.loads(_get_run('swift package dump-package'))
     targets = _get_targets_from(package)
+    version = _get_run("BuildSystem/common/revision.sh")
     _recreate_docs_directory()
     for target in targets:
-        _generate_docs_for(target)
-    _write_index(targets)
+        _generate_docs_for(target, version)
+    _write_index(targets, version)
 
 if __name__ == '__main__':
     if not os.path.isfile('Package.swift'):
