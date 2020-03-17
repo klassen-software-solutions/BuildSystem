@@ -21,8 +21,8 @@ ifneq ($(wildcard Package.swift),)
 	LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) Package.swift
 endif
 
-_PACKAGE_RESOLVED_FILES := $(shell find . -name 'Package.resolved' -not -path '*/\.*')
-LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) $(_PACKAGE_RESOLVED_FILES)
+_SUBPROJECT_PACKAGE_RESOLVED_FILES := $(shell find . -name 'Package.resolved' -not -path '*/\.*' -not -path './Package.resolved')
+LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) $(_SUBPROJECT_PACKAGE_RESOLVED_FILES)
 
 PREREQS_LICENSE_FILE := Dependencies/prereqs-licenses.json
 ifeq ($(LICENSE_DEPENDENCIES),)
