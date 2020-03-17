@@ -13,12 +13,22 @@ ifneq ($(wildcard Dependencies/manual-licenses.json),)
 	LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) Dependencies/manual-licenses.json
 endif
 
+ifneq ($(wildcard Dependencies/prereqs.json),)
+    LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) Dependencies/prereqs.json
+endif
+
 ifneq ($(wildcard Package.swift),)
 	LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) Package.swift
 endif
 
 _PACKAGE_RESOLVED_FILES := $(shell find . -name 'Package.resolved' -not -path '*/\.*')
 LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) $(_PACKAGE_RESOLVED_FILES)
+
+PREREQS_LICENSE_FILE := Dependencies/prereqs-licenses.json
+ifeq ($(LICENSE_DEPENDENCIES),)
+    PREREQS_LICENSE_FILE :=
+endif
+
 
 build: forcelicense
 	$(SWIFT_BUILD_COMMAND)
@@ -41,7 +51,7 @@ clean:
 cleanall: clean
 	rm -rf docs
 
-forcelicense: Dependencies/prereqs-licenses.json
+forcelicense: $(PREREQS_LICENSE_FILE)
 
 Dependencies/prereqs-licenses.json: $(LICENSE_DEPENDENCIES)
 	license-scanner
