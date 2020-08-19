@@ -42,6 +42,7 @@ def _generate_docs_for(target: str, version: str):
     command += " --module-version='%s'" % version
     command += " --output='docs/%s'" % target
     command += " --use-safe-filenames"
+    command += " --documentation='Sources/%s/*.md'" % target
     if os.path.isfile('logo.png'):
         command += " --docset-icon=logo.png"
     author = os.environ.get('AUTHOR', None)
