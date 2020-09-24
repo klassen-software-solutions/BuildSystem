@@ -34,12 +34,13 @@ def _recreate_docs_directory():
         shutil.rmtree('docs')
     os.mkdir('docs')
 
-def _generate_docs_for(target: str, version: str):
+def _generate_docs_for(target: str, version: str, create_subdirs: bool):
     logging.info("Generating docs for %s", target)
     command = "jazzy"
     command += " --module=%s" % target
     command += " --module-version='%s'" % version
-    command += " --output='docs/%s'" % target
+    if create_subdirs:
+        command += " --output='docs/%s'" % target
     command += " --use-safe-filenames"
     command += " --documentation='Sources/%s/*.md'" % target
     if os.path.isfile('logo.png'):
@@ -88,12 +89,14 @@ def _write_index(targets: List, version: str):
 def _main():
     logging.basicConfig(level=logging.DEBUG)
     package = json.loads(_get_run('swift package dump-package'))
-    targets = _get_products_from(package)
+    products = _get_products_from(package)
+    is_more_than_one_product = len(products) > 1
     version = _get_run("BuildSystem/common/revision.sh")
     _recreate_docs_directory()
-    for target in targets:
-        _generate_docs_for(target, version)
-    _write_index(targets, version)
+    for product in products:
+        _generate_docs_for(product, version, is_more_than_one_product)
+    if is_more_than_one_product:
+        _write_index(products, version)
 
 if __name__ == '__main__':
     if not os.path.isfile('Package.swift'):
