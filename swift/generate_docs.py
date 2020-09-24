@@ -22,13 +22,12 @@ def _get_run(command: str, directory: str = None) -> str:
                          stdout=subprocess.PIPE)
     return res.stdout.decode('utf-8').strip()
 
-def _get_targets_from(package: Dict) -> List:
-    targets = []
-    for target in package.get('targets', []):
-        if target.get('type', '') == 'regular':
-            targets.append(target['name'])
-    logging.debug("Found targets: %s", targets)
-    return targets
+def _get_products_from(package: Dict) -> List:
+    products = []
+    for product in package.get('products', []):
+        products.append(product['name'])
+    logging.debug("Found products: %s", products)
+    return products
 
 def _recreate_docs_directory():
     if os.path.isdir('docs'):
@@ -89,7 +88,7 @@ def _write_index(targets: List, version: str):
 def _main():
     logging.basicConfig(level=logging.DEBUG)
     package = json.loads(_get_run('swift package dump-package'))
-    targets = _get_targets_from(package)
+    targets = _get_products_from(package)
     version = _get_run("BuildSystem/common/revision.sh")
     _recreate_docs_directory()
     for target in targets:
