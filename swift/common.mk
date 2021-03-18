@@ -1,12 +1,13 @@
 .PHONY: analyze build check clean docs forcelicense prep
 
+VERSION := $(shell BuildSystem/common/revision.sh)
+
 SWIFT_BUILD_COMMAND :=
 SWIFT_TEST_COMMAND :=
 ifneq ($(wildcard Package.swift),)
 	SWIFT_BUILD_COMMAND := swift build
 	SWIFT_TEST_COMMAND := swift test
 endif
-
 
 LICENSE_DEPENDENCIES :=
 ifneq ($(wildcard Dependencies/manual-licenses.json),)
@@ -46,7 +47,7 @@ docs:
 	env AUTHOR="$(AUTHOR)" AUTHOR_URL="$(AUTHOR_URL)" BuildSystem/swift/generate_docs.py
 
 clean:
-	rm -rf *~
+	rm -rf *~ REVISION
 
 cleanall: clean
 	rm -rf docs
