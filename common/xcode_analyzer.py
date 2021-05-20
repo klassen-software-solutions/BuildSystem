@@ -17,6 +17,8 @@ def _get_run(command: str):
     return res.stdout.decode('utf-8').strip()
 
 def _process(command: str):
+    # pylint: disable=consider-using-with
+    #   Justification: It would complicate things and this is a short running script.
     logging.info("processing: %s", command)
     res = subprocess.Popen("%s" % command, shell=True,
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
