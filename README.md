@@ -14,8 +14,8 @@ describes how a project should make use of its utilities.
 
 If you wish to contribute to this project, you need to be familiar with the following development procedures:
 
-* [Git Procedures](https://www.kss.cc/standards-git.html)
-* [Python Coding Standards](https://www.kss.cc/standards-python.html)
+* [Git Procedures](https://klassensoftwaresolutions.ca/standards-git.html)
+* [Python Coding Standards](https://klassensoftwaresolutions.ca/standards-python.html)
 
 Note that this project makes the following changes from our standard procedures:
 
