@@ -40,8 +40,8 @@ def _main():
     analyze_failed = False
     _run("rm -rf Build")
     command = "xcodebuild -alltargets -configuration Debug -quiet analyze"
-    command += ' HEADER_SEARCH_PATHS="%s/include %s/include"' % (install_prefix, build_dir)
-    command += ' LIBRARY_SEARCH_PATHS="%s/lib"' % install_prefix
+    command += ' HEADER_SEARCH_PATHS="%s/include %s/include"' % (build_dir, install_prefix)
+    command += ' LIBRARY_SEARCH_PATHS="%s/lib %s/lib"' % (build_dir, install_prefix)
     for line in _process(command):
         line = line.decode('utf-8').rstrip()
         print("%s" % line)
