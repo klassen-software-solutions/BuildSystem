@@ -49,12 +49,16 @@ def _get_run(command: str):
 def _update_repo(dirname: str):
     logging.info("Updating %s", dirname)
     _run('git pull', directory=dirname)
+    if os.path.isfile(f"{dirname}/.gitmodules"):
+        _run('git submodule update --init --recursive', directory=dirname)
 
 def _clone_repo(url: str, dirname: str, branch: str):
     logging.info("Cloning %s", url)
     _run('git clone %s' % url)
     if branch:
         _run('git checkout %s' % branch, directory=dirname)
+    if os.path.isfile(f"{dirname}/.gitmodules"):
+        _run('git submodule update --init --recursive', directory=dirname)
 
 def _rebuild_and_install(dirname: str):
     logging.info("Rebuilding %s", dirname)
