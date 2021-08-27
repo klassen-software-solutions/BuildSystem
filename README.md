@@ -24,3 +24,8 @@ branch directly from `master` and when done create a merge request directly back
 * There are no unit tests in this project.
 * You should run `make analyze` before creating your merge request. This will run a static analysis
 on all Python and Bash scripts.
+
+## What has changed in V2?
+
+Version 2 has changed the C++ version from 14 to 17. If you still need to support 14 you can use
+the branch `release/v1`.

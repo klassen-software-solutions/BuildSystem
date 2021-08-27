@@ -16,7 +16,7 @@ import requests
 
 def _read_prereqs_file() -> List:
     try:
-        with open('Dependancies/prereqs.json', 'r') as file:
+        with open('Dependancies/prereqs.json', 'r', encoding='utf-8') as file:
             return json.load(file)
     except IOError:
         logging.info("Could not open Dependancies/prereqs.json. Assuming no dependancies.")
