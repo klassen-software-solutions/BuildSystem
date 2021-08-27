@@ -1,8 +1,17 @@
 .PHONY: prep build check clean analyze install
 
 # Only include the license file dependancy if there are prerequisites to examine.
-PREREQS_LICENSE_FILE := Dependancies/prereqs-licenses.json
-ifeq ($(wildcard Dependancies/prereqs.json),)
+LICENSE_DEPENDENCIES :=
+ifneq ($(wildcard Dependencies/manual-licenses.json),)
+	LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) Dependencies/manual-licenses.json
+endif
+
+ifneq ($(wildcard Dependencies/prereqs.json),)
+    LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) Dependencies/prereqs.json
+endif
+
+PREREQS_LICENSE_FILE := Dependencies/prereqs-licenses.json
+ifeq ($(LICENSE_DEPENDENCIES),)
     PREREQS_LICENSE_FILE :=
 endif
 
@@ -14,8 +23,8 @@ VERSION_FILE := $(PREFIX)/$(PACKAGE)/_version.py
 build: $(PREREQS_LICENSE_FILE) $(VERSION_FILE) REVISION
 	python3 setup.py sdist bdist_wheel
 
-$(PREREQS_LICENSE_FILE): Dependancies/prereqs.json
-	BuildSystem/common/license_scanner.py
+$(PREREQS_LICENSE_FILE): $(LICENSE_DEPENDENCIES)
+	license-scanner
 
 $(VERSION_FILE): REVISION
 	BuildSystem/python/update_version.sh $(PREFIX) $(PACKAGE)

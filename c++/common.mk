@@ -41,11 +41,22 @@ else
 	CFLAGS := $(CFLAGS) $(OPTIMIZED_FLAGS)
 endif
 
-# Only include the license file dependancy if there are prerequisites to examine.
-PREREQS_LICENSE_FILE := Dependancies/prereqs-licenses.json
-ifeq ($(wildcard Dependancies/prereqs.json),)
-	PREREQS_LICENSE_FILE :=
+# Only include the license file dependency if there are prerequisites to examine.
+LICENSE_DEPENDENCIES :=
+ifneq ($(wildcard Dependencies/manual-licenses.json),)
+    LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) Dependencies/manual-licenses.json
 endif
+
+ifneq ($(wildcard Dependencies/prereqs.json),)
+    LICENSE_DEPENDENCIES := $(LICENSE_DEPENDENCIES) Dependencies/prereqs.json
+endif
+
+PREREQS_LICENSE_FILE := Dependencies/prereqs-licenses.json
+ifeq ($(LICENSE_DEPENDENCIES),)
+    PREREQS_LICENSE_FILE :=
+endif
+
+
 
 CFLAGS := $(CFLAGS) -I$(BUILDDIR)/include
 CXXFLAGS := $(CXXFLAGS) -I$(BUILDDIR)/include -std=c++17 -Wno-unknown-pragmas
@@ -82,8 +93,8 @@ build: library $(PREREQS_LICENSE_FILE)
 
 library: $(LIBPATH)
 
-Dependancies/prereqs-licenses.json: Dependancies/prereqs.json
-	BuildSystem/common/license_scanner.py
+Dependencies/prereqs-licenses.json: $(LICENSE_DEPENDENCIES)
+	license-scanner
 
 
 # Use "make help" to give some instructions on how the build system works.
