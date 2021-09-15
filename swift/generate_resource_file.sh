@@ -37,7 +37,7 @@ fi
     echo "import Foundation"
     echo ""
     echo "fileprivate let encodedString = \"\"\""
-    base64 --break=80 -i "$inFile"
+    base64 -i "$inFile"
     echo "\"\"\""
     echo ""
     echo "func $streamName() -> InputStream {"
