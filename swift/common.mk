@@ -55,4 +55,4 @@ cleanall: clean
 forcelicense: $(PREREQS_LICENSE_FILE)
 
 Dependencies/prereqs-licenses.json: $(LICENSE_DEPENDENCIES)
-	license-scanner
+	-license-scanner
