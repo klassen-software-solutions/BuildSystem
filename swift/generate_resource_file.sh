@@ -19,6 +19,11 @@ if [ $# -ne 3 ]; then
     exit 255
 fi
 
+echo "WARNING: This file is deprecated and will be removed in the next major version."
+echo "   Swift 5.3 allows resoures to be added to a package. That mechanism should be"
+echo "   used instead of this one."
+echo ""
+
 inFile=$1
 outFile=$2
 streamName=$3
