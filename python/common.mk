@@ -24,7 +24,7 @@ build: $(PREREQS_LICENSE_FILE) $(VERSION_FILE) REVISION
 	python3 setup.py sdist bdist_wheel
 
 $(PREREQS_LICENSE_FILE): $(LICENSE_DEPENDENCIES)
-	license-scanner
+	-license-scanner
 
 $(VERSION_FILE): REVISION
 	BuildSystem/python/update_version.sh $(PREFIX) $(PACKAGE)

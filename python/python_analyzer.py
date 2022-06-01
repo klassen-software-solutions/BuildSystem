@@ -11,9 +11,9 @@ import sys
 
 def _main(directory):
     if not os.path.isdir(directory):
-        print("'%s' does not exist or is not a directory" % directory)
+        print(f"'{directory}' does not exist or is not a directory")
         sys.exit(-1)
-    subprocess.run("pylint %s" % directory, shell=True, check=True)
+    subprocess.run(f"pylint {directory}", shell=True, check=True)
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:

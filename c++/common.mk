@@ -94,7 +94,7 @@ build: library $(PREREQS_LICENSE_FILE)
 library: $(LIBPATH)
 
 Dependencies/prereqs-licenses.json: $(LICENSE_DEPENDENCIES)
-	license-scanner
+	-license-scanner
 
 
 # Use "make help" to give some instructions on how the build system works.
