@@ -30,8 +30,8 @@ def _parse_command_line():
     parser.add_argument('--verbose', action='store_true', help='Show debugging information')
     args = parser.parse_args()
     if not os.path.isdir(args.path):
-        raise RuntimeError("The path '%s' is not a directory" % args.path)
-    if args.path == '.' or args.path == '..':
+        raise RuntimeError(f"The path '{args.path}' is not a directory")
+    if args.path in ('.', '..'):
         raise RuntimeError("The path must not be the current or parent directory")
     return args
 
@@ -50,7 +50,7 @@ def _count_files(path: str) -> int:
     return num_files
 
 def _backup(ftp, dirname: str) -> bool:
-    backupdir = "%s.bak" % dirname
+    backupdir = f"{dirname}.bak"
     logging.debug("Backing up %s to %s", dirname, backupdir)
     _remove_path(ftp, backupdir)
     try:
@@ -81,7 +81,7 @@ def _remove_dir(ftp, path: str, dirname: str):
             (name, details) = next(generator)
             if details['type'] == 'file':
                 logging.debug("  %s/%s/%s", path, dirname, name)
-                ftp.delete("%s/%s/%s" % (path, dirname, name))
+                ftp.delete(f"{path}/{dirname}/{name}")
             elif details['type'] == 'dir':
                 _remove_dir(ftp, path + "/" + dirname, name)
             else:
@@ -89,14 +89,14 @@ def _remove_dir(ftp, path: str, dirname: str):
     except StopIteration:
         pass
     logging.debug("  %s/%s", path, dirname)
-    ftp.rmd("%s/%s" % (path, dirname))
+    ftp.rmd(f"{path}/{dirname}")
 
 def _upload(ftp, file_system_root: str, ftp_server_root: str, filename: str):
-    file_system_filename = '%s/%s' % (file_system_root, filename)
-    ftp_server_filename = '%s/%s' % (ftp_server_root, filename)
+    file_system_filename = f"{file_system_root}/{filename}"
+    ftp_server_filename = f"{ftp_server_root}/{filename}"
     logging.debug("Uploading %s to %s", file_system_filename, ftp_server_filename)
     with open(file_system_filename, 'rb') as infile:
-        ftp.storbinary('STOR %s' % ftp_server_filename, infile)
+        ftp.storbinary(f"STOR {ftp_server_filename}", infile)
 
 def _display_percent_done(num_copied: int, total_num_files: int, prev_percent_done: int) -> int:
     perc_done = int(round(num_copied / total_num_files * 100))
@@ -119,7 +119,7 @@ def _copy_files(ftp, path: str, total_num_files: int):
             continue
         rootdir = _remove_prefix(root, prefix)
         for subdir in dirs:
-            dirname = "%s/%s" % (rootdir, subdir)
+            dirname = f"{rootdir}/{subdir}"
             logging.debug("Creating dir %s", dirname)
             ftp.mkd(dirname)
         for file in files:
@@ -132,7 +132,7 @@ def _copy_files(ftp, path: str, total_num_files: int):
 def _publish(url, args):
     published_dir = os.path.basename(args.path)
     if published_dir == '':
-        raise RuntimeError("Could not determine the basename of %s" % args.path)
+        raise RuntimeError(f"Could not determine the basename of {args.path}")
     logging.info("Publishing %s to %s as %s", args.path, args.url, published_dir)
     ftp = ftplib.FTP_TLS(host=url.netloc,
                          user='' if args.user is None else args.user,
